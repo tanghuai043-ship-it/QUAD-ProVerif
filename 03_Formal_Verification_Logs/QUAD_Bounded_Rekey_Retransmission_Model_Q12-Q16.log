@@ -1,0 +1,799 @@
+Linear part: No equation.
+Convergent part:
+mlkem_decaps(k,mlkem_encaps_ct(mlkem_pk(k),r)) = mlkem_encaps_ss(mlkem_pk(k),r)
+Completing equations...
+Completed equations:
+mlkem_decaps(k,mlkem_encaps_ct(mlkem_pk(k),r)) = mlkem_encaps_ss(mlkem_pk(k),r)
+Process 0 (that is, the initial process):
+{1}let pk_g: pkey = mlkem_pk(sk_g) in
+{2}out(c, pk_g);
+{3}!
+{4}new id_u: host;
+{5}new id_g: host;
+{6}new session_sid: sid_t;
+{7}new es0: sym_key;
+{8}let ku0: sym_key = hkdf_expand(es0,info_u2g(session_sid,Epoch0)) in
+{9}let kg0: sym_key = hkdf_expand(es0,info_g2u(session_sid,Epoch0)) in
+{10}out(c, session_sid);
+(
+    {11}let u: host = id_u in
+    {12}let g: host = id_g in
+    {13}let sid_1: sid_t = session_sid in
+    {14}let es0_1: sym_key = es0 in
+    {15}new rid: rid_t;
+    {16}new r_mlkem: nonce;
+    {17}let ct: ct_t = mlkem_encaps_ct(pk_g,r_mlkem) in
+    {18}let ss: ss_t = mlkem_encaps_ss(pk_g,r_mlkem) in
+    {19}let rh: hash_t = make_rh(sid_1,Epoch0,Epoch1,rid,ct) in
+    {20}let rprk: sym_key = hkdf_extract_rekey(es0_1,ss) in
+    {21}let es1: sym_key = hkdf_expand(rprk,info_es(Epoch1,rh)) in
+    {22}let ku1: sym_key = hkdf_expand(es1,info_u2g(sid_1,Epoch1)) in
+    {23}let kg1: sym_key = hkdf_expand(es1,info_g2u(sid_1,Epoch1)) in
+    {24}let krk: sym_key = hkdf_expand(es1,info_rekey_confirm(rh)) in
+    {25}let kc_expected: mac_t = hmac(krk,kc_input(rh,rid,Epoch1)) in
+    {26}event UAV_Rekey_Request(g,u,sid_1,rid,es1);
+    {27}let reqp: bitstring = payload_rekey_req(Epoch1,rid,ct) in
+    {28}new seq_q1: seq_t;
+    {29}let n_q1: gcm_nonce_t = make_gcm_nonce(Epoch0,seq_q1) in
+    {30}let ad_q1: bitstring = make_aad(sid_1,Dir_U2G,Epoch0,seq_q1,Type_RekeyReq,Len_RekeyReq) in
+    {31}out(c, (sid_1,Dir_U2G,Epoch0,seq_q1,Type_RekeyReq,Len_RekeyReq,aead_enc(ku0,n_q1,ad_q1,reqp)));
+    {32}new seq_q2: seq_t;
+    {33}let n_q2: gcm_nonce_t = make_gcm_nonce(Epoch0,seq_q2) in
+    {34}let ad_q2: bitstring = make_aad(sid_1,Dir_U2G,Epoch0,seq_q2,Type_RekeyReq,Len_RekeyReq) in
+    {35}out(c, (sid_1,Dir_U2G,Epoch0,seq_q2,Type_RekeyReq,Len_RekeyReq,aead_enc(ku0,n_q2,ad_q2,reqp)));
+    {36}in(c, (=sid_1,=Dir_G2U,=Epoch0,seq_ack: seq_t,=Type_RekeyAck,=Len_RekeyAck,enc_ack: aead_t));
+    {37}let n_ack: gcm_nonce_t = make_gcm_nonce(Epoch0,seq_ack) in
+    {38}let ad_ack: bitstring = make_aad(sid_1,Dir_G2U,Epoch0,seq_ack,Type_RekeyAck,Len_RekeyAck) in
+    {39}let p_ack: bitstring = aead_dec(kg0,n_ack,ad_ack,enc_ack) in
+    {40}if (get_ack_rid(p_ack) = rid) then
+    {41}if (get_ack_epoch(p_ack) = Epoch1) then
+    {42}if (get_ack_kc(p_ack) = kc_expected) then
+    {43}event UAV_Rekey_Commit_Start(g,u,sid_1,rid,es1);
+    {44}let cp: bitstring = payload_rekey_commit(rid) in
+    {45}new seq_c1: seq_t;
+    {46}let n_c1: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_c1) in
+    {47}let ad_c1: bitstring = make_aad(sid_1,Dir_U2G,Epoch1,seq_c1,Type_RekeyCommit,Len_RekeyCommit) in
+    {48}out(c, (sid_1,Dir_U2G,Epoch1,seq_c1,Type_RekeyCommit,Len_RekeyCommit,aead_enc(ku1,n_c1,ad_c1,cp)));
+    {49}new seq_c2: seq_t;
+    {50}let n_c2: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_c2) in
+    {51}let ad_c2: bitstring = make_aad(sid_1,Dir_U2G,Epoch1,seq_c2,Type_RekeyCommit,Len_RekeyCommit) in
+    {52}out(c, (sid_1,Dir_U2G,Epoch1,seq_c2,Type_RekeyCommit,Len_RekeyCommit,aead_enc(ku1,n_c2,ad_c2,cp)));
+    {53}in(c, (=sid_1,=Dir_G2U,=Epoch1,seq_ready: seq_t,=Type_RekeyReady,=Len_RekeyReady,enc_ready: aead_t));
+    {54}let n_ready: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_ready) in
+    {55}let ad_ready: bitstring = make_aad(sid_1,Dir_G2U,Epoch1,seq_ready,Type_RekeyReady,Len_RekeyReady) in
+    {56}let p_ready: bitstring = aead_dec(kg1,n_ready,ad_ready,enc_ready) in
+    {57}if (get_ready_rid(p_ready) = rid) then
+    {58}event UAV_Rekey_Done(g,u,sid_1,rid,es1)
+) | (
+    {59}let g_1: host = id_g in
+    {60}let u_1: host = id_u in
+    {61}let sid_2: sid_t = session_sid in
+    {62}let sk_gcs: skey = sk_g in
+    {63}let es0_2: sym_key = es0 in
+    {64}in(c, (=sid_2,=Dir_U2G,=Epoch0,seq1: seq_t,=Type_RekeyReq,=Len_RekeyReq,e1: aead_t));
+    {65}let n1: gcm_nonce_t = make_gcm_nonce(Epoch0,seq1) in
+    {66}let ad1: bitstring = make_aad(sid_2,Dir_U2G,Epoch0,seq1,Type_RekeyReq,Len_RekeyReq) in
+    {67}let p1: bitstring = aead_dec(ku0,n1,ad1,e1) in
+    {68}if (get_req_new(p1) = Epoch1) then
+    {69}let rid_1: rid_t = get_req_rid(p1) in
+    {70}let ct_1: ct_t = get_req_ct(p1) in
+    {71}let ss_1: ss_t = mlkem_decaps(sk_gcs,ct_1) in
+    {72}let rh_1: hash_t = make_rh(sid_2,Epoch0,Epoch1,rid_1,ct_1) in
+    {73}let rprk_1: sym_key = hkdf_extract_rekey(es0_2,ss_1) in
+    {74}let es1_1: sym_key = hkdf_expand(rprk_1,info_es(Epoch1,rh_1)) in
+    {75}let ku1_1: sym_key = hkdf_expand(es1_1,info_u2g(sid_2,Epoch1)) in
+    {76}let kg1_1: sym_key = hkdf_expand(es1_1,info_g2u(sid_2,Epoch1)) in
+    {77}let krk_1: sym_key = hkdf_expand(es1_1,info_rekey_confirm(rh_1)) in
+    {78}let kc: mac_t = hmac(krk_1,kc_input(rh_1,rid_1,Epoch1)) in
+    {79}event GCS_Rekey_Decap_Once(g_1,u_1,sid_2,rid_1,es1_1);
+    {80}new seq_ack1: seq_t;
+    {81}let n_ack1: gcm_nonce_t = make_gcm_nonce(Epoch0,seq_ack1) in
+    {82}let ad_ack1: bitstring = make_aad(sid_2,Dir_G2U,Epoch0,seq_ack1,Type_RekeyAck,Len_RekeyAck) in
+    {83}out(c, (sid_2,Dir_G2U,Epoch0,seq_ack1,Type_RekeyAck,Len_RekeyAck,aead_enc(kg0,n_ack1,ad_ack1,payload_rekey_ack(rid_1,Epoch1,kc))));
+    (
+        {84}in(c, (=sid_2,=Dir_U2G,=Epoch0,seq2: seq_t,=Type_RekeyReq,=Len_RekeyReq,e2: aead_t));
+        {85}let n2: gcm_nonce_t = make_gcm_nonce(Epoch0,seq2) in
+        {86}let ad2: bitstring = make_aad(sid_2,Dir_U2G,Epoch0,seq2,Type_RekeyReq,Len_RekeyReq) in
+        {87}let p2: bitstring = aead_dec(ku0,n2,ad2,e2) in
+        {88}if (get_req_new(p2) = Epoch1) then
+        {89}if (get_req_rid(p2) = rid_1) then
+        {90}if (get_req_ct(p2) = ct_1) then
+        {91}event GCS_Duplicate_Req_AckOnly(g_1,u_1,sid_2,rid_1,es1_1);
+        {92}new seq_ack2: seq_t;
+        {93}let n_ack2: gcm_nonce_t = make_gcm_nonce(Epoch0,seq_ack2) in
+        {94}let ad_ack2: bitstring = make_aad(sid_2,Dir_G2U,Epoch0,seq_ack2,Type_RekeyAck,Len_RekeyAck) in
+        {95}out(c, (sid_2,Dir_G2U,Epoch0,seq_ack2,Type_RekeyAck,Len_RekeyAck,aead_enc(kg0,n_ack2,ad_ack2,payload_rekey_ack(rid_1,Epoch1,kc))))
+    ) | (
+        {96}in(c, (=sid_2,=Dir_U2G,=Epoch1,seq_c1_1: seq_t,=Type_RekeyCommit,=Len_RekeyCommit,enc_c1: aead_t));
+        {97}let n_c1_1: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_c1_1) in
+        {98}let ad_c1_1: bitstring = make_aad(sid_2,Dir_U2G,Epoch1,seq_c1_1,Type_RekeyCommit,Len_RekeyCommit) in
+        {99}let p_c1: bitstring = aead_dec(ku1_1,n_c1_1,ad_c1_1,enc_c1) in
+        {100}if (get_commit_rid(p_c1) = rid_1) then
+        {101}event GCS_Rekey_Commit_Transition(g_1,u_1,sid_2,rid_1,es1_1);
+        {102}new seq_r1: seq_t;
+        {103}let n_r1: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_r1) in
+        {104}let ad_r1: bitstring = make_aad(sid_2,Dir_G2U,Epoch1,seq_r1,Type_RekeyReady,Len_RekeyReady) in
+        {105}out(c, (sid_2,Dir_G2U,Epoch1,seq_r1,Type_RekeyReady,Len_RekeyReady,aead_enc(kg1_1,n_r1,ad_r1,payload_rekey_ready(rid_1))));
+        {106}in(c, (=sid_2,=Dir_U2G,=Epoch1,seq_c2_1: seq_t,=Type_RekeyCommit,=Len_RekeyCommit,enc_c2: aead_t));
+        {107}let n_c2_1: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_c2_1) in
+        {108}let ad_c2_1: bitstring = make_aad(sid_2,Dir_U2G,Epoch1,seq_c2_1,Type_RekeyCommit,Len_RekeyCommit) in
+        {109}let p_c2: bitstring = aead_dec(ku1_1,n_c2_1,ad_c2_1,enc_c2) in
+        {110}if (get_commit_rid(p_c2) = rid_1) then
+        {111}event GCS_Duplicate_Commit_ReadyOnly(g_1,u_1,sid_2,rid_1,es1_1);
+        {112}new seq_r2: seq_t;
+        {113}let n_r2: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_r2) in
+        {114}let ad_r2: bitstring = make_aad(sid_2,Dir_G2U,Epoch1,seq_r2,Type_RekeyReady,Len_RekeyReady) in
+        {115}out(c, (sid_2,Dir_G2U,Epoch1,seq_r2,Type_RekeyReady,Len_RekeyReady,aead_enc(kg1_1,n_r2,ad_r2,payload_rekey_ready(rid_1))))
+    )
+)
+
+--  Process 1 (that is, process 0, with let moved downwards):
+{1}let pk_g: pkey = mlkem_pk(sk_g) in
+{2}out(c, pk_g);
+{3}!
+{4}new id_u: host;
+{5}new id_g: host;
+{6}new session_sid: sid_t;
+{7}new es0: sym_key;
+{10}out(c, session_sid);
+{9}let kg0: sym_key = hkdf_expand(es0,info_g2u(session_sid,Epoch0)) in
+{8}let ku0: sym_key = hkdf_expand(es0,info_u2g(session_sid,Epoch0)) in
+(
+    {15}new rid: rid_t;
+    {16}new r_mlkem: nonce;
+    {18}let ss: ss_t = mlkem_encaps_ss(pk_g,r_mlkem) in
+    {14}let es0_1: sym_key = es0 in
+    {20}let rprk: sym_key = hkdf_extract_rekey(es0_1,ss) in
+    {17}let ct: ct_t = mlkem_encaps_ct(pk_g,r_mlkem) in
+    {13}let sid_1: sid_t = session_sid in
+    {19}let rh: hash_t = make_rh(sid_1,Epoch0,Epoch1,rid,ct) in
+    {21}let es1: sym_key = hkdf_expand(rprk,info_es(Epoch1,rh)) in
+    {12}let g: host = id_g in
+    {11}let u: host = id_u in
+    {26}event UAV_Rekey_Request(g,u,sid_1,rid,es1);
+    {28}new seq_q1: seq_t;
+    {30}let ad_q1: bitstring = make_aad(sid_1,Dir_U2G,Epoch0,seq_q1,Type_RekeyReq,Len_RekeyReq) in
+    {29}let n_q1: gcm_nonce_t = make_gcm_nonce(Epoch0,seq_q1) in
+    {27}let reqp: bitstring = payload_rekey_req(Epoch1,rid,ct) in
+    {31}out(c, (sid_1,Dir_U2G,Epoch0,seq_q1,Type_RekeyReq,Len_RekeyReq,aead_enc(ku0,n_q1,ad_q1,reqp)));
+    {32}new seq_q2: seq_t;
+    {34}let ad_q2: bitstring = make_aad(sid_1,Dir_U2G,Epoch0,seq_q2,Type_RekeyReq,Len_RekeyReq) in
+    {33}let n_q2: gcm_nonce_t = make_gcm_nonce(Epoch0,seq_q2) in
+    {35}out(c, (sid_1,Dir_U2G,Epoch0,seq_q2,Type_RekeyReq,Len_RekeyReq,aead_enc(ku0,n_q2,ad_q2,reqp)));
+    {36}in(c, (=sid_1,=Dir_G2U,=Epoch0,seq_ack: seq_t,=Type_RekeyAck,=Len_RekeyAck,enc_ack: aead_t));
+    {38}let ad_ack: bitstring = make_aad(sid_1,Dir_G2U,Epoch0,seq_ack,Type_RekeyAck,Len_RekeyAck) in
+    {37}let n_ack: gcm_nonce_t = make_gcm_nonce(Epoch0,seq_ack) in
+    {39}let p_ack: bitstring = aead_dec(kg0,n_ack,ad_ack,enc_ack) in
+    {40}if (get_ack_rid(p_ack) = rid) then
+    {41}if (get_ack_epoch(p_ack) = Epoch1) then
+    {24}let krk: sym_key = hkdf_expand(es1,info_rekey_confirm(rh)) in
+    {25}let kc_expected: mac_t = hmac(krk,kc_input(rh,rid,Epoch1)) in
+    {42}if (get_ack_kc(p_ack) = kc_expected) then
+    {43}event UAV_Rekey_Commit_Start(g,u,sid_1,rid,es1);
+    {45}new seq_c1: seq_t;
+    {47}let ad_c1: bitstring = make_aad(sid_1,Dir_U2G,Epoch1,seq_c1,Type_RekeyCommit,Len_RekeyCommit) in
+    {46}let n_c1: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_c1) in
+    {44}let cp: bitstring = payload_rekey_commit(rid) in
+    {22}let ku1: sym_key = hkdf_expand(es1,info_u2g(sid_1,Epoch1)) in
+    {48}out(c, (sid_1,Dir_U2G,Epoch1,seq_c1,Type_RekeyCommit,Len_RekeyCommit,aead_enc(ku1,n_c1,ad_c1,cp)));
+    {49}new seq_c2: seq_t;
+    {51}let ad_c2: bitstring = make_aad(sid_1,Dir_U2G,Epoch1,seq_c2,Type_RekeyCommit,Len_RekeyCommit) in
+    {50}let n_c2: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_c2) in
+    {52}out(c, (sid_1,Dir_U2G,Epoch1,seq_c2,Type_RekeyCommit,Len_RekeyCommit,aead_enc(ku1,n_c2,ad_c2,cp)));
+    {53}in(c, (=sid_1,=Dir_G2U,=Epoch1,seq_ready: seq_t,=Type_RekeyReady,=Len_RekeyReady,enc_ready: aead_t));
+    {55}let ad_ready: bitstring = make_aad(sid_1,Dir_G2U,Epoch1,seq_ready,Type_RekeyReady,Len_RekeyReady) in
+    {54}let n_ready: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_ready) in
+    {23}let kg1: sym_key = hkdf_expand(es1,info_g2u(sid_1,Epoch1)) in
+    {56}let p_ready: bitstring = aead_dec(kg1,n_ready,ad_ready,enc_ready) in
+    {57}if (get_ready_rid(p_ready) = rid) then
+    {58}event UAV_Rekey_Done(g,u,sid_1,rid,es1)
+) | (
+    {61}let sid_2: sid_t = session_sid in
+    {64}in(c, (=sid_2,=Dir_U2G,=Epoch0,seq1: seq_t,=Type_RekeyReq,=Len_RekeyReq,e1: aead_t));
+    {66}let ad1: bitstring = make_aad(sid_2,Dir_U2G,Epoch0,seq1,Type_RekeyReq,Len_RekeyReq) in
+    {65}let n1: gcm_nonce_t = make_gcm_nonce(Epoch0,seq1) in
+    {67}let p1: bitstring = aead_dec(ku0,n1,ad1,e1) in
+    {68}if (get_req_new(p1) = Epoch1) then
+    {69}let rid_1: rid_t = get_req_rid(p1) in
+    {70}let ct_1: ct_t = get_req_ct(p1) in
+    {62}let sk_gcs: skey = sk_g in
+    {71}let ss_1: ss_t = mlkem_decaps(sk_gcs,ct_1) in
+    {63}let es0_2: sym_key = es0 in
+    {73}let rprk_1: sym_key = hkdf_extract_rekey(es0_2,ss_1) in
+    {72}let rh_1: hash_t = make_rh(sid_2,Epoch0,Epoch1,rid_1,ct_1) in
+    {74}let es1_1: sym_key = hkdf_expand(rprk_1,info_es(Epoch1,rh_1)) in
+    {60}let u_1: host = id_u in
+    {59}let g_1: host = id_g in
+    {79}event GCS_Rekey_Decap_Once(g_1,u_1,sid_2,rid_1,es1_1);
+    {80}new seq_ack1: seq_t;
+    {82}let ad_ack1: bitstring = make_aad(sid_2,Dir_G2U,Epoch0,seq_ack1,Type_RekeyAck,Len_RekeyAck) in
+    {81}let n_ack1: gcm_nonce_t = make_gcm_nonce(Epoch0,seq_ack1) in
+    {77}let krk_1: sym_key = hkdf_expand(es1_1,info_rekey_confirm(rh_1)) in
+    {78}let kc: mac_t = hmac(krk_1,kc_input(rh_1,rid_1,Epoch1)) in
+    {83}out(c, (sid_2,Dir_G2U,Epoch0,seq_ack1,Type_RekeyAck,Len_RekeyAck,aead_enc(kg0,n_ack1,ad_ack1,payload_rekey_ack(rid_1,Epoch1,kc))));
+    (
+        {84}in(c, (=sid_2,=Dir_U2G,=Epoch0,seq2: seq_t,=Type_RekeyReq,=Len_RekeyReq,e2: aead_t));
+        {86}let ad2: bitstring = make_aad(sid_2,Dir_U2G,Epoch0,seq2,Type_RekeyReq,Len_RekeyReq) in
+        {85}let n2: gcm_nonce_t = make_gcm_nonce(Epoch0,seq2) in
+        {87}let p2: bitstring = aead_dec(ku0,n2,ad2,e2) in
+        {88}if (get_req_new(p2) = Epoch1) then
+        {89}if (get_req_rid(p2) = rid_1) then
+        {90}if (get_req_ct(p2) = ct_1) then
+        {91}event GCS_Duplicate_Req_AckOnly(g_1,u_1,sid_2,rid_1,es1_1);
+        {92}new seq_ack2: seq_t;
+        {94}let ad_ack2: bitstring = make_aad(sid_2,Dir_G2U,Epoch0,seq_ack2,Type_RekeyAck,Len_RekeyAck) in
+        {93}let n_ack2: gcm_nonce_t = make_gcm_nonce(Epoch0,seq_ack2) in
+        {95}out(c, (sid_2,Dir_G2U,Epoch0,seq_ack2,Type_RekeyAck,Len_RekeyAck,aead_enc(kg0,n_ack2,ad_ack2,payload_rekey_ack(rid_1,Epoch1,kc))))
+    ) | (
+        {96}in(c, (=sid_2,=Dir_U2G,=Epoch1,seq_c1_1: seq_t,=Type_RekeyCommit,=Len_RekeyCommit,enc_c1: aead_t));
+        {98}let ad_c1_1: bitstring = make_aad(sid_2,Dir_U2G,Epoch1,seq_c1_1,Type_RekeyCommit,Len_RekeyCommit) in
+        {97}let n_c1_1: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_c1_1) in
+        {75}let ku1_1: sym_key = hkdf_expand(es1_1,info_u2g(sid_2,Epoch1)) in
+        {99}let p_c1: bitstring = aead_dec(ku1_1,n_c1_1,ad_c1_1,enc_c1) in
+        {100}if (get_commit_rid(p_c1) = rid_1) then
+        {101}event GCS_Rekey_Commit_Transition(g_1,u_1,sid_2,rid_1,es1_1);
+        {102}new seq_r1: seq_t;
+        {104}let ad_r1: bitstring = make_aad(sid_2,Dir_G2U,Epoch1,seq_r1,Type_RekeyReady,Len_RekeyReady) in
+        {103}let n_r1: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_r1) in
+        {76}let kg1_1: sym_key = hkdf_expand(es1_1,info_g2u(sid_2,Epoch1)) in
+        {105}out(c, (sid_2,Dir_G2U,Epoch1,seq_r1,Type_RekeyReady,Len_RekeyReady,aead_enc(kg1_1,n_r1,ad_r1,payload_rekey_ready(rid_1))));
+        {106}in(c, (=sid_2,=Dir_U2G,=Epoch1,seq_c2_1: seq_t,=Type_RekeyCommit,=Len_RekeyCommit,enc_c2: aead_t));
+        {108}let ad_c2_1: bitstring = make_aad(sid_2,Dir_U2G,Epoch1,seq_c2_1,Type_RekeyCommit,Len_RekeyCommit) in
+        {107}let n_c2_1: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_c2_1) in
+        {109}let p_c2: bitstring = aead_dec(ku1_1,n_c2_1,ad_c2_1,enc_c2) in
+        {110}if (get_commit_rid(p_c2) = rid_1) then
+        {111}event GCS_Duplicate_Commit_ReadyOnly(g_1,u_1,sid_2,rid_1,es1_1);
+        {112}new seq_r2: seq_t;
+        {114}let ad_r2: bitstring = make_aad(sid_2,Dir_G2U,Epoch1,seq_r2,Type_RekeyReady,Len_RekeyReady) in
+        {113}let n_r2: gcm_nonce_t = make_gcm_nonce(Epoch1,seq_r2) in
+        {115}out(c, (sid_2,Dir_G2U,Epoch1,seq_r2,Type_RekeyReady,Len_RekeyReady,aead_enc(kg1_1,n_r2,ad_r2,payload_rekey_ready(rid_1))))
+    )
+)
+
+-- Query inj-event(GCS_Rekey_Decap_Once(g_2,u_2,s,r,e)) ==> inj-event(UAV_Rekey_Request(g_2,u_2,s,r,e)) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 161 rules (50 with conclusion selected). Queue: 51 rules.
+400 rules inserted. Base: 271 rules (80 with conclusion selected). Queue: 65 rules.
+600 rules inserted. Base: 345 rules (96 with conclusion selected). Queue: 100 rules.
+800 rules inserted. Base: 457 rules (100 with conclusion selected). Queue: 192 rules.
+1000 rules inserted. Base: 568 rules (112 with conclusion selected). Queue: 225 rules.
+1200 rules inserted. Base: 688 rules (136 with conclusion selected). Queue: 250 rules.
+1400 rules inserted. Base: 795 rules (176 with conclusion selected). Queue: 209 rules.
+1600 rules inserted. Base: 910 rules (195 with conclusion selected). Queue: 152 rules.
+1800 rules inserted. Base: 982 rules (240 with conclusion selected). Queue: 72 rules.
+Starting query inj-event(GCS_Rekey_Decap_Once(g_2,u_2,s,r,e)) ==> inj-event(UAV_Rekey_Request(g_2,u_2,s,r,e))
+goal reachable: b-inj-event(UAV_Rekey_Request(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ26_1) -> inj-event(GCS_Rekey_Decap_Once(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_decaps(sk_g[],mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ79_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+@occ79_1 = @occ79[e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+@occ26_1 = @occ26[!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Request(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ26_1) -> inj-event(GCS_Rekey_Decap_Once(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_decaps(sk_g[],mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ79_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+@occ79_1 = @occ79[e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+@occ26_1 = @occ26[!1 = @sid]
+RESULT inj-event(GCS_Rekey_Decap_Once(g_2,u_2,s,r,e)) ==> inj-event(UAV_Rekey_Request(g_2,u_2,s,r,e)) is true.
+-- Query event(GCS_Duplicate_Req_AckOnly(g_2,u_2,s,r,e)) ==> event(GCS_Rekey_Decap_Once(g_2,u_2,s,r,e)) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 158 rules (50 with conclusion selected). Queue: 53 rules.
+400 rules inserted. Base: 283 rules (81 with conclusion selected). Queue: 64 rules.
+600 rules inserted. Base: 346 rules (100 with conclusion selected). Queue: 173 rules.
+800 rules inserted. Base: 424 rules (100 with conclusion selected). Queue: 350 rules.
+1000 rules inserted. Base: 522 rules (100 with conclusion selected). Queue: 594 rules.
+1200 rules inserted. Base: 604 rules (110 with conclusion selected). Queue: 588 rules.
+1400 rules inserted. Base: 705 rules (116 with conclusion selected). Queue: 688 rules.
+1600 rules inserted. Base: 780 rules (116 with conclusion selected). Queue: 772 rules.
+1800 rules inserted. Base: 869 rules (116 with conclusion selected). Queue: 779 rules.
+2000 rules inserted. Base: 949 rules (120 with conclusion selected). Queue: 773 rules.
+2200 rules inserted. Base: 1071 rules (124 with conclusion selected). Queue: 925 rules.
+2400 rules inserted. Base: 1168 rules (132 with conclusion selected). Queue: 969 rules.
+2600 rules inserted. Base: 1287 rules (250 with conclusion selected). Queue: 850 rules.
+2800 rules inserted. Base: 1376 rules (275 with conclusion selected). Queue: 821 rules.
+3000 rules inserted. Base: 1465 rules (304 with conclusion selected). Queue: 792 rules.
+3200 rules inserted. Base: 1553 rules (336 with conclusion selected). Queue: 760 rules.
+3400 rules inserted. Base: 1651 rules (340 with conclusion selected). Queue: 728 rules.
+3600 rules inserted. Base: 1786 rules (429 with conclusion selected). Queue: 599 rules.
+3800 rules inserted. Base: 1881 rules (436 with conclusion selected). Queue: 564 rules.
+4000 rules inserted. Base: 1976 rules (459 with conclusion selected). Queue: 529 rules.
+4200 rules inserted. Base: 2097 rules (532 with conclusion selected). Queue: 411 rules.
+4400 rules inserted. Base: 2223 rules (652 with conclusion selected). Queue: 288 rules.
+4600 rules inserted. Base: 2346 rules (724 with conclusion selected). Queue: 153 rules.
+4800 rules inserted. Base: 2458 rules (724 with conclusion selected). Queue: 33 rules.
+Starting query event(GCS_Duplicate_Req_AckOnly(g_2,u_2,s,r,e)) ==> event(GCS_Rekey_Decap_Once(g_2,u_2,s,r,e))
+goal reachable: b-event(GCS_Rekey_Decap_Once(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_decaps(sk_g[],mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))))) -> event(GCS_Duplicate_Req_AckOnly(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_decaps(sk_g[],mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))))
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+RESULT event(GCS_Duplicate_Req_AckOnly(g_2,u_2,s,r,e)) ==> event(GCS_Rekey_Decap_Once(g_2,u_2,s,r,e)) is true.
+-- Query inj-event(GCS_Rekey_Commit_Transition(g_2,u_2,s,r,e)) ==> inj-event(UAV_Rekey_Commit_Start(g_2,u_2,s,r,e)) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 168 rules (52 with conclusion selected). Queue: 62 rules.
+400 rules inserted. Base: 281 rules (76 with conclusion selected). Queue: 75 rules.
+600 rules inserted. Base: 346 rules (92 with conclusion selected). Queue: 201 rules.
+800 rules inserted. Base: 413 rules (92 with conclusion selected). Queue: 340 rules.
+1000 rules inserted. Base: 529 rules (92 with conclusion selected). Queue: 583 rules.
+1200 rules inserted. Base: 604 rules (98 with conclusion selected). Queue: 626 rules.
+1400 rules inserted. Base: 723 rules (116 with conclusion selected). Queue: 714 rules.
+1600 rules inserted. Base: 772 rules (116 with conclusion selected). Queue: 716 rules.
+1800 rules inserted. Base: 872 rules (116 with conclusion selected). Queue: 814 rules.
+2000 rules inserted. Base: 959 rules (116 with conclusion selected). Queue: 802 rules.
+2200 rules inserted. Base: 1055 rules (128 with conclusion selected). Queue: 846 rules.
+2400 rules inserted. Base: 1175 rules (128 with conclusion selected). Queue: 1002 rules.
+2600 rules inserted. Base: 1273 rules (180 with conclusion selected). Queue: 953 rules.
+2800 rules inserted. Base: 1380 rules (268 with conclusion selected). Queue: 864 rules.
+3000 rules inserted. Base: 1466 rules (284 with conclusion selected). Queue: 839 rules.
+3200 rules inserted. Base: 1563 rules (328 with conclusion selected). Queue: 799 rules.
+3400 rules inserted. Base: 1652 rules (356 with conclusion selected). Queue: 775 rules.
+3600 rules inserted. Base: 1767 rules (356 with conclusion selected). Queue: 708 rules.
+3800 rules inserted. Base: 1887 rules (452 with conclusion selected). Queue: 597 rules.
+4000 rules inserted. Base: 1978 rules (452 with conclusion selected). Queue: 572 rules.
+4200 rules inserted. Base: 2084 rules (500 with conclusion selected). Queue: 507 rules.
+4400 rules inserted. Base: 2208 rules (572 with conclusion selected). Queue: 386 rules.
+4600 rules inserted. Base: 2329 rules (692 with conclusion selected). Queue: 265 rules.
+4800 rules inserted. Base: 2453 rules (740 with conclusion selected). Queue: 130 rules.
+5000 rules inserted. Base: 2555 rules (740 with conclusion selected). Queue: 3 rules.
+Starting query inj-event(GCS_Rekey_Commit_Transition(g_2,u_2,s,r,e)) ==> inj-event(UAV_Rekey_Commit_Start(g_2,u_2,s,r,e))
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q2_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+seq_c2_2 = seq_c2[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c2_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c2_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c2_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q2_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+seq_c2_2 = seq_c2[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c2_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c2_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c2_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q2_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+seq_c2_2 = seq_c2[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c2_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c2_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c2_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q2_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+seq_c2_2 = seq_c2[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c2_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c2_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c2_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q1_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+seq_c2_2 = seq_c2[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c2_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c2_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c2_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q1_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+seq_c2_2 = seq_c2[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c2_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c2_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c2_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q1_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+seq_c2_2 = seq_c2[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c2_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c2_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c2_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q1_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+seq_c2_2 = seq_c2[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c2_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c2_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c2_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_ack1_1 = seq_ack1[e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+seq_c2_2 = seq_c2[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c2_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c2_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c2_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_ack1_1 = seq_ack1[e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+seq_c2_2 = seq_c2[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c2_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c2_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c2_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_ack1_1 = seq_ack1[e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+seq_c2_2 = seq_c2[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c2_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c2_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c2_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_ack1_1 = seq_ack1[e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+seq_c2_2 = seq_c2[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c2_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c2_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c2_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q2_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+seq_c1_2 = seq_c1[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c1_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c1_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c1_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q2_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+seq_c1_2 = seq_c1[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c1_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c1_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c1_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q2_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+seq_c1_2 = seq_c1[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c1_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c1_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c1_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q2_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+seq_c1_2 = seq_c1[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c1_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c1_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c1_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q1_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+seq_c1_2 = seq_c1[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c1_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c1_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c1_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q1_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+seq_c1_2 = seq_c1[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c1_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c1_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c1_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q1_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+seq_c1_2 = seq_c1[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c1_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c1_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c1_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_ack2_1 = seq_ack2[e2 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq2 = seq_q1_1,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+seq_c1_2 = seq_c1[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c1_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c1_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c1_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack2_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack2_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack2_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_ack1_1 = seq_ack1[e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+seq_c1_2 = seq_c1[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c1_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c1_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c1_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+seq_ack1_1 = seq_ack1[e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+seq_c1_2 = seq_c1[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c1_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c1_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c1_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_ack1_1 = seq_ack1[e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+seq_c1_2 = seq_c1[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+seq_q2_1 = seq_q2[!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c1_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c1_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c1_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q2_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q2_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q2_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+goal reachable: b-inj-event(UAV_Rekey_Commit_Start(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ43_1) -> inj-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))),@occ101_1)
+The hypothesis occurs strictly before the conclusion.
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+seq_q1_1 = seq_q1[!1 = @sid]
+seq_ack1_1 = seq_ack1[e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+seq_c1_2 = seq_c1[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+@occ101_1 = @occ101[enc_c1 = aead_enc(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_u2g(session_sid_1,Epoch1[])),make_gcm_nonce(Epoch1[],seq_c1_2),make_aad(session_sid_1,Dir_U2G[],Epoch1[],seq_c1_2,Type_RekeyCommit[],Len_RekeyCommit[]),payload_rekey_commit(rid_2)),seq_c1_1 = seq_c1_2,e1 = aead_enc(hkdf_expand(es0_3,info_u2g(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_q1_1),make_aad(session_sid_1,Dir_U2G[],Epoch0[],seq_q1_1,Type_RekeyReq[],Len_RekeyReq[]),payload_rekey_req(Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))),seq1 = seq_q1_1,!1 = @sid]
+@occ43_1 = @occ43[enc_ack = aead_enc(hkdf_expand(es0_3,info_g2u(session_sid_1,Epoch0[])),make_gcm_nonce(Epoch0[],seq_ack1_1),make_aad(session_sid_1,Dir_G2U[],Epoch0[],seq_ack1_1,Type_RekeyAck[],Len_RekeyAck[]),payload_rekey_ack(rid_2,Epoch1[],hmac(hkdf_expand(hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),info_rekey_confirm(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))),kc_input(make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)),rid_2,Epoch1[])))),seq_ack = seq_ack1_1,!1 = @sid]
+RESULT inj-event(GCS_Rekey_Commit_Transition(g_2,u_2,s,r,e)) ==> inj-event(UAV_Rekey_Commit_Start(g_2,u_2,s,r,e)) is true.
+-- Query event(GCS_Duplicate_Commit_ReadyOnly(g_2,u_2,s,r,e)) ==> event(GCS_Rekey_Commit_Transition(g_2,u_2,s,r,e)) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 168 rules (52 with conclusion selected). Queue: 62 rules.
+400 rules inserted. Base: 281 rules (76 with conclusion selected). Queue: 75 rules.
+600 rules inserted. Base: 343 rules (92 with conclusion selected). Queue: 176 rules.
+800 rules inserted. Base: 422 rules (92 with conclusion selected). Queue: 359 rules.
+1000 rules inserted. Base: 517 rules (92 with conclusion selected). Queue: 595 rules.
+1200 rules inserted. Base: 601 rules (105 with conclusion selected). Queue: 586 rules.
+1400 rules inserted. Base: 701 rules (109 with conclusion selected). Queue: 688 rules.
+1600 rules inserted. Base: 778 rules (109 with conclusion selected). Queue: 778 rules.
+1800 rules inserted. Base: 865 rules (109 with conclusion selected). Queue: 779 rules.
+2000 rules inserted. Base: 947 rules (113 with conclusion selected). Queue: 773 rules.
+2200 rules inserted. Base: 1069 rules (117 with conclusion selected). Queue: 929 rules.
+2400 rules inserted. Base: 1165 rules (127 with conclusion selected). Queue: 967 rules.
+2600 rules inserted. Base: 1284 rules (245 with conclusion selected). Queue: 848 rules.
+2800 rules inserted. Base: 1372 rules (269 with conclusion selected). Queue: 820 rules.
+3000 rules inserted. Base: 1462 rules (299 with conclusion selected). Queue: 790 rules.
+3200 rules inserted. Base: 1551 rules (329 with conclusion selected). Queue: 760 rules.
+3400 rules inserted. Base: 1647 rules (333 with conclusion selected). Queue: 728 rules.
+3600 rules inserted. Base: 1783 rules (424 with conclusion selected). Queue: 597 rules.
+3800 rules inserted. Base: 1877 rules (429 with conclusion selected). Queue: 564 rules.
+4000 rules inserted. Base: 1973 rules (453 with conclusion selected). Queue: 528 rules.
+4200 rules inserted. Base: 2095 rules (525 with conclusion selected). Queue: 408 rules.
+4400 rules inserted. Base: 2218 rules (647 with conclusion selected). Queue: 286 rules.
+4600 rules inserted. Base: 2340 rules (717 with conclusion selected). Queue: 152 rules.
+4800 rules inserted. Base: 2453 rules (717 with conclusion selected). Queue: 31 rules.
+Starting query event(GCS_Duplicate_Commit_ReadyOnly(g_2,u_2,s,r,e)) ==> event(GCS_Rekey_Commit_Transition(g_2,u_2,s,r,e))
+goal reachable: b-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))))) -> event(GCS_Duplicate_Commit_ReadyOnly(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))))
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+RESULT event(GCS_Duplicate_Commit_ReadyOnly(g_2,u_2,s,r,e)) ==> event(GCS_Rekey_Commit_Transition(g_2,u_2,s,r,e)) is true.
+-- Query event(UAV_Rekey_Done(g_2,u_2,s,r,e)) ==> event(GCS_Rekey_Commit_Transition(g_2,u_2,s,r,e)) in process 1.
+Translating the process into Horn clauses...
+Completing...
+200 rules inserted. Base: 164 rules (52 with conclusion selected). Queue: 59 rules.
+400 rules inserted. Base: 266 rules (76 with conclusion selected). Queue: 66 rules.
+600 rules inserted. Base: 328 rules (92 with conclusion selected). Queue: 173 rules.
+800 rules inserted. Base: 429 rules (92 with conclusion selected). Queue: 405 rules.
+1000 rules inserted. Base: 507 rules (92 with conclusion selected). Queue: 592 rules.
+1200 rules inserted. Base: 594 rules (104 with conclusion selected). Queue: 592 rules.
+1400 rules inserted. Base: 686 rules (108 with conclusion selected). Queue: 696 rules.
+1600 rules inserted. Base: 774 rules (108 with conclusion selected). Queue: 800 rules.
+1800 rules inserted. Base: 858 rules (108 with conclusion selected). Queue: 780 rules.
+2000 rules inserted. Base: 940 rules (116 with conclusion selected). Queue: 770 rules.
+2200 rules inserted. Base: 1076 rules (116 with conclusion selected). Queue: 978 rules.
+2400 rules inserted. Base: 1163 rules (142 with conclusion selected). Queue: 952 rules.
+2600 rules inserted. Base: 1278 rules (252 with conclusion selected). Queue: 841 rules.
+2800 rules inserted. Base: 1363 rules (268 with conclusion selected). Queue: 821 rules.
+3000 rules inserted. Base: 1458 rules (308 with conclusion selected). Queue: 781 rules.
+3200 rules inserted. Base: 1544 rules (332 with conclusion selected). Queue: 757 rules.
+3400 rules inserted. Base: 1652 rules (333 with conclusion selected). Queue: 708 rules.
+3600 rules inserted. Base: 1781 rules (429 with conclusion selected). Queue: 584 rules.
+3800 rules inserted. Base: 1869 rules (429 with conclusion selected). Queue: 564 rules.
+4000 rules inserted. Base: 1971 rules (469 with conclusion selected). Queue: 512 rules.
+4200 rules inserted. Base: 2095 rules (541 with conclusion selected). Queue: 392 rules.
+4400 rules inserted. Base: 2218 rules (664 with conclusion selected). Queue: 269 rules.
+4600 rules inserted. Base: 2336 rules (717 with conclusion selected). Queue: 140 rules.
+4800 rules inserted. Base: 2441 rules (717 with conclusion selected). Queue: 12 rules.
+Starting query event(UAV_Rekey_Done(g_2,u_2,s,r,e)) ==> event(GCS_Rekey_Commit_Transition(g_2,u_2,s,r,e))
+goal reachable: b-event(GCS_Rekey_Commit_Transition(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1)))))) -> event(UAV_Rekey_Done(id_g_1,id_u_1,session_sid_1,rid_2,hkdf_expand(hkdf_extract_rekey(es0_3,mlkem_encaps_ss(mlkem_pk(sk_g[]),r_mlkem_1)),info_es(Epoch1[],make_rh(session_sid_1,Epoch0[],Epoch1[],rid_2,mlkem_encaps_ct(mlkem_pk(sk_g[]),r_mlkem_1))))))
+Abbreviations:
+id_g_1 = id_g[!1 = @sid]
+id_u_1 = id_u[!1 = @sid]
+session_sid_1 = session_sid[!1 = @sid]
+rid_2 = rid[!1 = @sid]
+es0_3 = es0[!1 = @sid]
+r_mlkem_1 = r_mlkem[!1 = @sid]
+RESULT event(UAV_Rekey_Done(g_2,u_2,s,r,e)) ==> event(GCS_Rekey_Commit_Transition(g_2,u_2,s,r,e)) is true.
+
+--------------------------------------------------------------
+Verification summary:
+
+Query inj-event(GCS_Rekey_Decap_Once(g_2,u_2,s,r,e)) ==> inj-event(UAV_Rekey_Request(g_2,u_2,s,r,e)) is true.
+
+Query event(GCS_Duplicate_Req_AckOnly(g_2,u_2,s,r,e)) ==> event(GCS_Rekey_Decap_Once(g_2,u_2,s,r,e)) is true.
+
+Query inj-event(GCS_Rekey_Commit_Transition(g_2,u_2,s,r,e)) ==> inj-event(UAV_Rekey_Commit_Start(g_2,u_2,s,r,e)) is true.
+
+Query event(GCS_Duplicate_Commit_ReadyOnly(g_2,u_2,s,r,e)) ==> event(GCS_Rekey_Commit_Transition(g_2,u_2,s,r,e)) is true.
+
+Query event(UAV_Rekey_Done(g_2,u_2,s,r,e)) ==> event(GCS_Rekey_Commit_Transition(g_2,u_2,s,r,e)) is true.
+
+--------------------------------------------------------------
+

@@ -1,0 +1,330 @@
+(*
+QUAD -- Authenticated Handshake and Protected Data (Q1-Q6)
+ProVerif 2.05
+
+Handshake messages:
+  M1: ClientHello_Init
+  M2: {T_slot, N_G, Cookie}
+  M3: {PID_i, T_slot, N_U, N_G, Cookie, ct, MAC_U}
+  M4: {SID, Finished_G}
+  M5: {SID, Finished_U}
+  M6: AEAD record with {SID, Direction, Epoch, Seq, Type, Length}
+
+Frame-type tags distinguish message forms in the symbolic model; they are
+not additional application payload fields. The source IP in the public-channel
+envelope is symbolic receiver-side transport metadata, not a wire field.
+The attacker can control this metadata, so the model checks IP-dependent
+Cookie consistency but does not establish UDP source-IP authenticity,
+anti-spoofing, slot expiry, or rate limiting. Cache and timer behavior
+is abstracted.
+*)
+set traceDisplay = none.
+set reconstructTrace = false.
+set displayDerivation = false.
+
+free c: channel.
+
+type host.
+type ip_t.
+type slot_t.
+type nonce.
+type seq_t.
+type len_t.
+type gcm_nonce_t.
+type pkey.
+type skey.
+type ss_t.
+type ct_t.
+type sym_key.
+type mac_t.
+type cookie_t.
+type hash_t.
+type sid_t.
+type aead_t.
+
+free Dir_U2G: bitstring.
+free Dir_G2U: bitstring.
+free Epoch0: bitstring.
+
+(* Cryptographic abstractions. *)
+fun hmac(sym_key, bitstring): mac_t.
+fun hash2bits(hash_t): bitstring [data].
+
+(* Domain label L_C is implicit in this distinct symbolic constructor. *)
+fun calc_cookie(sym_key, ip_t, slot_t, nonce): cookie_t.
+
+fun mlkem_pk(skey): pkey.
+fun mlkem_encaps_ct(pkey, nonce): ct_t.
+fun mlkem_encaps_ss(pkey, nonce): ss_t.
+fun mlkem_decaps(skey, ct_t): ss_t.
+equation forall k:skey, r:nonce;
+  mlkem_decaps(k, mlkem_encaps_ct(mlkem_pk(k),r))
+  = mlkem_encaps_ss(mlkem_pk(k),r).
+
+(* Canonical wire transcripts. Message-type/domain tags are implicit in the
+   distinct constructors canon_m2/canon_m3/canon_m4/canon_m5. *)
+fun canon_m2(slot_t, nonce, cookie_t): bitstring [data].
+fun canon_m3(host, slot_t, nonce, nonce, cookie_t, ct_t, mac_t): bitstring [data].
+fun canon_m4(sid_t, mac_t): bitstring [data].
+fun canon_m5(sid_t, mac_t): bitstring [data].
+fun make_th3(bitstring, bitstring, bitstring): hash_t [data].
+fun make_th4(hash_t, bitstring): hash_t [data].
+fun make_th5(hash_t, bitstring): hash_t [data].
+fun make_sid(hash_t): sid_t [data].
+
+(* AuthID is built from protocol fields, whereas HID additionally binds
+   GCS-observed source IP; neither field is sent on the QUAD wire. *)
+fun make_auth_id(host, slot_t, nonce, nonce, cookie_t, ct_t): hash_t [data].
+fun make_hid(host, ip_t, slot_t, nonce, nonce, cookie_t, ct_t): hash_t [data].
+
+(* Domain-separated KDF inputs. *)
+fun macu_input(host, host, slot_t, nonce, nonce, cookie_t, ct_t): bitstring [data].
+fun info_ksym(hash_t): bitstring [data].
+fun info_fin_g(hash_t): bitstring [data].
+fun info_fin_u(hash_t): bitstring [data].
+fun info_es(bitstring, hash_t): bitstring [data].
+fun info_u2g(sid_t, bitstring): bitstring [data].
+fun info_g2u(sid_t, bitstring): bitstring [data].
+fun hkdf_extract_hs(mac_t, ss_t): sym_key.
+fun hkdf_expand(sym_key, bitstring): sym_key.
+
+(* AEAD record layer. *)
+fun make_gcm_nonce(bitstring, seq_t): gcm_nonce_t [data].
+fun make_aad(sid_t, bitstring, bitstring, seq_t, bitstring, len_t): bitstring [data].
+fun aead_enc(sym_key, gcm_nonce_t, bitstring, bitstring): aead_t.
+reduc forall k:sym_key, n:gcm_nonce_t, ad:bitstring, m:bitstring;
+  aead_dec(k,n,ad,aead_enc(k,n,ad,m)) = m.
+
+free Payload_READY: bitstring.
+fun payload_telemetry(bitstring): bitstring [data].
+fun payload_command(bitstring): bitstring [data].
+reduc forall x:bitstring; get_telemetry(payload_telemetry(x)) = x.
+reduc forall x:bitstring; get_command(payload_command(x)) = x.
+
+(* Symbolic frame tags for M1-M5. *)
+free ClientHello_Init: bitstring.
+free CookieReply: bitstring.
+free ClientAuth: bitstring.
+free ServerFinished: bitstring.
+free ClientFinished: bitstring.
+
+(* AEAD header Type and Length constants. *)
+free Type_SessionReady: bitstring.
+free Type_Telemetry: bitstring.
+free Type_Command: bitstring.
+free Len_SessionReady: len_t.
+free Len_Telemetry_Test: len_t.
+free Len_Command_Test: len_t.
+
+(* Long-term material and secrecy witnesses. *)
+free sk_g: skey [private].
+free ltsk_u: sym_key [private].
+free mk_c: sym_key [private].
+free id_u: host.
+free id_g: host.
+(* Receiver-observed source IP of the honest UAV in the symbolic network. *)
+free ip_u: ip_t.
+free secret_u2g: bitstring [private].
+free secret_g2u: bitstring [private].
+
+table ltsk_table(host, sym_key).
+table hs_claim(hash_t).
+table hs_cache(hash_t, sid_t, mac_t).
+table seen_record(sid_t, bitstring, bitstring, seq_t).
+
+event UAV_Auth_Request(host, host, hash_t).
+event GCS_Accept_UAV(host, host, hash_t).
+event GCS_Send_Finished(host, host, sid_t, sym_key).
+event UAV_Accept_GCS_Finished(host, host, sid_t, sym_key).
+event UAV_Send_Finished(host, host, sid_t, sym_key).
+event GCS_Accept_UAV_Finished(host, host, sid_t, sym_key).
+event GCS_Send_SessionReady(host, host, sid_t, sym_key).
+event UAV_Established(host, host, sid_t, sym_key).
+
+(* Security queries. *)
+query attacker(secret_u2g).
+query attacker(secret_g2u).
+query g:host,u:host,h:hash_t;
+  event(GCS_Accept_UAV(g,u,h)) ==> event(UAV_Auth_Request(g,u,h)).
+query g:host,u:host,s:sid_t,p:sym_key;
+  inj-event(UAV_Accept_GCS_Finished(g,u,s,p))
+  ==> inj-event(GCS_Send_Finished(g,u,s,p)).
+query g:host,u:host,s:sid_t,p:sym_key;
+  event(GCS_Accept_UAV_Finished(g,u,s,p))
+  ==> event(UAV_Send_Finished(g,u,s,p)).
+query g:host,u:host,s:sid_t,k:sym_key;
+  inj-event(UAV_Established(g,u,s,k))
+  ==> inj-event(GCS_Send_SessionReady(g,u,s,k)).
+
+let processUAVHandshake(u:host,g:host,ltsk:sym_key,pk_gcs:pkey) =
+  (* M1 wire payload is ClientHello_Init only; ip_u is transport metadata. *)
+  out(c,(ip_u,ClientHello_Init));
+
+  (* M2: only T_slot, N_G, Cookie (plus symbolic frame tag). *)
+  in(c,(=CookieReply,t_slot:slot_t,n_g:nonce,cookie:cookie_t));
+
+  new n_u:nonce;
+  new r_mlkem:nonce;
+  let ct = mlkem_encaps_ct(pk_gcs,r_mlkem) in
+  let ss_u = mlkem_encaps_ss(pk_gcs,r_mlkem) in
+  let mac_u = hmac(ltsk,macu_input(u,g,t_slot,n_u,n_g,cookie,ct)) in
+  let auth_id = make_auth_id(u,t_slot,n_u,n_g,cookie,ct) in
+  event UAV_Auth_Request(g,u,auth_id);
+
+  (* M3. The second identical output intentionally models a timeout/retransmit
+     of the same logical ClientAuth, not mandatory double transmission. *)
+  out(c,(ip_u,(ClientAuth,u,t_slot,n_u,n_g,cookie,ct,mac_u)));
+  out(c,(ip_u,(ClientAuth,u,t_slot,n_u,n_g,cookie,ct,mac_u)));
+
+  let th3_u = make_th3(
+      ClientHello_Init,
+      canon_m2(t_slot,n_g,cookie),
+      canon_m3(u,t_slot,n_u,n_g,cookie,ct,mac_u)) in
+  let k_sym_u = hmac(ltsk,info_ksym(th3_u)) in
+  let prk_u = hkdf_extract_hs(k_sym_u,ss_u) in
+  let sid_u = make_sid(th3_u) in
+
+  (* M4: {SID, Finished_G}. *)
+  in(c,(=ServerFinished,sid_recv:sid_t,fin_g_recv:mac_t));
+  if sid_recv = sid_u then
+    let k_fin_g_u = hkdf_expand(prk_u,info_fin_g(th3_u)) in
+    if fin_g_recv = hmac(k_fin_g_u,hash2bits(th3_u)) then
+      event UAV_Accept_GCS_Finished(g,u,sid_u,prk_u);
+      let th4_u = make_th4(th3_u,canon_m4(sid_u,fin_g_recv)) in
+      let k_fin_u = hkdf_expand(prk_u,info_fin_u(th4_u)) in
+      let fin_u = hmac(k_fin_u,hash2bits(th4_u)) in
+      event UAV_Send_Finished(g,u,sid_u,prk_u);
+
+      (* M5. Duplicate output models retransmission if M6 is lost. *)
+      out(c,(ClientFinished,sid_u,fin_u));
+      out(c,(ClientFinished,sid_u,fin_u));
+
+      let th5_u = make_th5(th4_u,canon_m5(sid_u,fin_u)) in
+      let es0_u = hkdf_expand(prk_u,info_es(Epoch0,th5_u)) in
+      let k_u2g_0_u = hkdf_expand(es0_u,info_u2g(sid_u,Epoch0)) in
+      let k_g2u_0_u = hkdf_expand(es0_u,info_g2u(sid_u,Epoch0)) in
+
+      (* M6: header {SID,Direction,Epoch,Seq,Type,Length} + AEAD(READY). *)
+      in(c,(=sid_u,=Dir_G2U,=Epoch0,seq_ready:seq_t,
+            =Type_SessionReady,=Len_SessionReady,enc_ready:aead_t));
+      get seen_record(=sid_u,=Dir_G2U,=Epoch0,=seq_ready) in 0 else
+        let nonce_ready = make_gcm_nonce(Epoch0,seq_ready) in
+        let aad_ready = make_aad(
+            sid_u,Dir_G2U,Epoch0,seq_ready,Type_SessionReady,Len_SessionReady) in
+        let ready_plain = aead_dec(k_g2u_0_u,nonce_ready,aad_ready,enc_ready) in
+        if ready_plain = Payload_READY then
+          insert seen_record(sid_u,Dir_G2U,Epoch0,seq_ready);
+          event UAV_Established(g,u,sid_u,k_g2u_0_u);
+
+          (* Protected U2G application-data secrecy witness. *)
+          new seq_data_u:seq_t;
+          let nonce_data_u = make_gcm_nonce(Epoch0,seq_data_u) in
+          let aad_data_u = make_aad(
+              sid_u,Dir_U2G,Epoch0,seq_data_u,Type_Telemetry,Len_Telemetry_Test) in
+          let enc_data_u = aead_enc(
+              k_u2g_0_u,nonce_data_u,aad_data_u,payload_telemetry(secret_u2g)) in
+          out(c,(sid_u,Dir_U2G,Epoch0,seq_data_u,
+                 Type_Telemetry,Len_Telemetry_Test,enc_data_u)).
+
+let processCookieIssuer(mk_cookie:sym_key) =
+  (* ip_src_m1 is receiver-observed metadata, NOT a field in M1. *)
+  in(c,(ip_src_m1:ip_t,=ClientHello_Init));
+  new t_slot:slot_t;
+  new n_g:nonce;
+  let cookie = calc_cookie(mk_cookie,ip_src_m1,t_slot,n_g) in
+  out(c,(CookieReply,t_slot,n_g,cookie)).
+
+let processFinishedRetry(g:host,u:host,sid:sid_t,
+                         fin_expected:mac_t,k_g2u_0:sym_key) =
+  in(c,(=ClientFinished,=sid,fin_recv:mac_t));
+  if fin_recv = fin_expected then
+    new seq_ready2:seq_t;
+    let nonce_ready2 = make_gcm_nonce(Epoch0,seq_ready2) in
+    let aad_ready2 = make_aad(
+        sid,Dir_G2U,Epoch0,seq_ready2,Type_SessionReady,Len_SessionReady) in
+    let enc_ready2 = aead_enc(k_g2u_0,nonce_ready2,aad_ready2,Payload_READY) in
+    event GCS_Send_SessionReady(g,u,sid,k_g2u_0);
+    out(c,(sid,Dir_G2U,Epoch0,seq_ready2,
+           Type_SessionReady,Len_SessionReady,enc_ready2)).
+
+let processGCSHandshake(g:host,mk_cookie:sym_key,sk_gcs:skey) =
+  (* ip_src_m3 comes from receiver-side transport metadata (not M3 bytes).
+     A Cookie issued for another symbolic source IP cannot pass this equality.
+     Clock-slot expiry is NOT checked by this symbolic equality. *)
+  in(c,(ip_src_m3:ip_t,(=ClientAuth,u_req:host,t_slot:slot_t,n_u:nonce,n_g:nonce,
+        cookie:cookie_t,ct:ct_t,mac_u:mac_t)));
+  if cookie = calc_cookie(mk_cookie,ip_src_m3,t_slot,n_g) then
+    get ltsk_table(=u_req,k_ltsk:sym_key) in
+      if mac_u = hmac(k_ltsk,macu_input(u_req,g,t_slot,n_u,n_g,cookie,ct)) then
+        let auth_id = make_auth_id(u_req,t_slot,n_u,n_g,cookie,ct) in
+        let hid = make_hid(u_req,ip_src_m3,t_slot,n_u,n_g,cookie,ct) in
+        event GCS_Accept_UAV(g,u_req,auth_id);
+
+        (* Cached duplicate M3 => resend M4; no second decapsulation. *)
+        get hs_cache(=hid,sid_cached:sid_t,fin_cached:mac_t) in
+          out(c,(ServerFinished,sid_cached,fin_cached))
+        else
+          get hs_claim(=hid) in 0 else
+            (* This insert abstracts the implementation's atomic claim. *)
+            insert hs_claim(hid);
+            let ss_g = mlkem_decaps(sk_gcs,ct) in
+            let th3_g = make_th3(
+                ClientHello_Init,
+                canon_m2(t_slot,n_g,cookie),
+                canon_m3(u_req,t_slot,n_u,n_g,cookie,ct,mac_u)) in
+            let k_sym_g = hmac(k_ltsk,info_ksym(th3_g)) in
+            let prk_g = hkdf_extract_hs(k_sym_g,ss_g) in
+            let sid_g = make_sid(th3_g) in
+            let k_fin_g = hkdf_expand(prk_g,info_fin_g(th3_g)) in
+            let fin_g = hmac(k_fin_g,hash2bits(th3_g)) in
+            event GCS_Send_Finished(g,u_req,sid_g,prk_g);
+            insert hs_cache(hid,sid_g,fin_g);
+
+            (* M4. *)
+            out(c,(ServerFinished,sid_g,fin_g));
+
+            (* M5. *)
+            in(c,(=ClientFinished,=sid_g,fin_u:mac_t));
+            let th4_g = make_th4(th3_g,canon_m4(sid_g,fin_g)) in
+            let k_fin_u_g = hkdf_expand(prk_g,info_fin_u(th4_g)) in
+            if fin_u = hmac(k_fin_u_g,hash2bits(th4_g)) then
+              event GCS_Accept_UAV_Finished(g,u_req,sid_g,prk_g);
+              let th5_g = make_th5(th4_g,canon_m5(sid_g,fin_u)) in
+              let es0_g = hkdf_expand(prk_g,info_es(Epoch0,th5_g)) in
+              let k_u2g_0_g = hkdf_expand(es0_g,info_u2g(sid_g,Epoch0)) in
+              let k_g2u_0_g = hkdf_expand(es0_g,info_g2u(sid_g,Epoch0)) in
+
+              (* M6. *)
+              new seq_ready_g:seq_t;
+              let nonce_ready_g = make_gcm_nonce(Epoch0,seq_ready_g) in
+              let aad_ready_g = make_aad(
+                  sid_g,Dir_G2U,Epoch0,seq_ready_g,Type_SessionReady,Len_SessionReady) in
+              let enc_ready_g = aead_enc(
+                  k_g2u_0_g,nonce_ready_g,aad_ready_g,Payload_READY) in
+              event GCS_Send_SessionReady(g,u_req,sid_g,k_g2u_0_g);
+              out(c,(sid_g,Dir_G2U,Epoch0,seq_ready_g,
+                     Type_SessionReady,Len_SessionReady,enc_ready_g));
+
+              (* Protected G2U application-data secrecy witness. *)
+              new seq_cmd:seq_t;
+              let nonce_cmd = make_gcm_nonce(Epoch0,seq_cmd) in
+              let aad_cmd = make_aad(
+                  sid_g,Dir_G2U,Epoch0,seq_cmd,Type_Command,Len_Command_Test) in
+              let enc_cmd = aead_enc(
+                  k_g2u_0_g,nonce_cmd,aad_cmd,payload_command(secret_g2u)) in
+              out(c,(sid_g,Dir_G2U,Epoch0,seq_cmd,
+                     Type_Command,Len_Command_Test,enc_cmd));
+
+              !processFinishedRetry(g,u_req,sid_g,fin_u,k_g2u_0_g).
+
+process
+  let pk_g = mlkem_pk(sk_g) in
+  out(c,pk_g);
+  insert ltsk_table(id_u,ltsk_u);
+  (
+    !processUAVHandshake(id_u,id_g,ltsk_u,pk_g)
+    |
+    !processCookieIssuer(mk_c)
+    |
+    !processGCSHandshake(id_g,mk_c,sk_g)
+  )

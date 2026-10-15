@@ -1,0 +1,290 @@
+(*
+QUAD -- Authenticated Rekeying (Q7-Q11)
+ProVerif 2.05
+
+Rekey messages:
+  R1: {SID,U2G,e,Seq,RekeyReq,Length}; {e',RID,ct'} under K_U2G^e
+  R2: {SID,G2U,e,Seq,RekeyAck,Length}; {RID,e',KC_G} under K_G2U^e
+  R3: {SID,U2G,e',Seq,RekeyCommit,Length}; {RID,COMMIT} under K_U2G^e'
+  R4: {SID,G2U,e',Seq,RekeyReady,Length}; {RID,READY} under K_G2U^e'
+
+One logical R1-R4 transaction is modeled. Duplicate R1/R3 handling
+is evaluated separately in the bounded retransmission model (Q12-Q16).
+*)
+set traceDisplay = none.
+set reconstructTrace = false.
+set displayDerivation = false.
+
+free c: channel.
+
+type host.
+type nonce.
+type seq_t.
+type len_t.
+type gcm_nonce_t.
+type rid_t.
+type pkey.
+type skey.
+type ss_t.
+type ct_t.
+type sym_key.
+type mac_t.
+type hash_t.
+type sid_t.
+type aead_t.
+
+free Dir_U2G: bitstring.
+free Dir_G2U: bitstring.
+free Epoch0: bitstring.
+free Epoch1: bitstring.
+
+fun hmac(sym_key, bitstring): mac_t.
+
+fun mlkem_pk(skey): pkey.
+fun mlkem_encaps_ct(pkey, nonce): ct_t.
+fun mlkem_encaps_ss(pkey, nonce): ss_t.
+fun mlkem_decaps(skey, ct_t): ss_t.
+equation forall k:skey, r:nonce;
+  mlkem_decaps(k,mlkem_encaps_ct(mlkem_pk(k),r))
+  = mlkem_encaps_ss(mlkem_pk(k),r).
+
+(* Rekey key schedule. make_rh represents
+   SHA256(E(L_R,SID,e,e',RID,ct')). *)
+fun make_rh(sid_t, bitstring, bitstring, rid_t, ct_t): hash_t [data].
+fun info_es(bitstring, hash_t): bitstring [data].
+fun info_u2g(sid_t, bitstring): bitstring [data].
+fun info_g2u(sid_t, bitstring): bitstring [data].
+fun info_rekey_confirm(hash_t): bitstring [data].
+fun kc_input(hash_t, rid_t, bitstring): bitstring [data].
+fun hkdf_extract_rekey(sym_key, ss_t): sym_key.
+fun hkdf_expand(sym_key, bitstring): sym_key.
+
+(* AEAD record layer. *)
+fun make_gcm_nonce(bitstring, seq_t): gcm_nonce_t [data].
+fun make_aad(sid_t, bitstring, bitstring, seq_t, bitstring, len_t): bitstring [data].
+fun aead_enc(sym_key, gcm_nonce_t, bitstring, bitstring): aead_t.
+reduc forall k:sym_key, n:gcm_nonce_t, ad:bitstring, m:bitstring;
+  aead_dec(k,n,ad,aead_enc(k,n,ad,m)) = m.
+
+(* Rekey payload fields. *)
+fun payload_rekey_req(bitstring, rid_t, ct_t): bitstring [data].
+fun payload_rekey_ack(rid_t, bitstring, mac_t): bitstring [data].
+fun payload_rekey_commit(rid_t): bitstring [data].
+fun payload_rekey_ready(rid_t): bitstring [data].
+
+reduc forall en:bitstring, r:rid_t, ct:ct_t;
+  get_req_new(payload_rekey_req(en,r,ct)) = en.
+reduc forall en:bitstring, r:rid_t, ct:ct_t;
+  get_req_rid(payload_rekey_req(en,r,ct)) = r.
+reduc forall en:bitstring, r:rid_t, ct:ct_t;
+  get_req_ct(payload_rekey_req(en,r,ct)) = ct.
+
+reduc forall r:rid_t, en:bitstring, m:mac_t;
+  get_ack_rid(payload_rekey_ack(r,en,m)) = r.
+reduc forall r:rid_t, en:bitstring, m:mac_t;
+  get_ack_epoch(payload_rekey_ack(r,en,m)) = en.
+reduc forall r:rid_t, en:bitstring, m:mac_t;
+  get_ack_kc(payload_rekey_ack(r,en,m)) = m.
+
+reduc forall r:rid_t;
+  get_commit_rid(payload_rekey_commit(r)) = r.
+reduc forall r:rid_t;
+  get_ready_rid(payload_rekey_ready(r)) = r.
+
+fun payload_telemetry(bitstring): bitstring [data].
+fun payload_command(bitstring): bitstring [data].
+
+(* Header Type/Length constants. *)
+free Type_Telemetry: bitstring.
+free Type_Command: bitstring.
+free Type_RekeyReq: bitstring.
+free Type_RekeyAck: bitstring.
+free Type_RekeyCommit: bitstring.
+free Type_RekeyReady: bitstring.
+free Len_Telemetry_Test: len_t.
+free Len_Command_Test: len_t.
+free Len_RekeyReq: len_t.
+free Len_RekeyAck: len_t.
+free Len_RekeyCommit: len_t.
+free Len_RekeyReady: len_t.
+
+free AckWaitTelemetry: bitstring.
+free AckWaitCommand: bitstring.
+
+free sk_g: skey [private].
+free secret_rekey_u2g: bitstring [private].
+free secret_rekey_g2u: bitstring [private].
+
+event UAV_Rekey_Request(host, host, sid_t, rid_t, sym_key).
+event GCS_Rekey_Prepared(host, host, sid_t, rid_t, sym_key).
+event UAV_Rekey_Commit(host, host, sid_t, rid_t, sym_key).
+event GCS_Rekey_Commit(host, host, sid_t, rid_t, sym_key).
+event GCS_Rekey_Ready(host, host, sid_t, rid_t, sym_key).
+event UAV_Rekey_Done(host, host, sid_t, rid_t, sym_key).
+
+query attacker(secret_rekey_u2g).
+query attacker(secret_rekey_g2u).
+query g:host,u:host,s:sid_t,r:rid_t,e:sym_key;
+  event(GCS_Rekey_Prepared(g,u,s,r,e))
+  ==> event(UAV_Rekey_Request(g,u,s,r,e)).
+query g:host,u:host,s:sid_t,r:rid_t,e:sym_key;
+  event(GCS_Rekey_Commit(g,u,s,r,e))
+  ==> event(UAV_Rekey_Commit(g,u,s,r,e)).
+query g:host,u:host,s:sid_t,r:rid_t,e:sym_key;
+  inj-event(UAV_Rekey_Done(g,u,s,r,e))
+  ==> inj-event(GCS_Rekey_Ready(g,u,s,r,e)).
+
+let processGCSRekeyCore(g:host,u:host,sid:sid_t,sk_gcs:skey,
+                        es0:sym_key,k_u2g_old:sym_key,k_g2u_old:sym_key) =
+  (* R1: record header itself identifies the old epoch and RekeyReq type. *)
+  in(c,(=sid,=Dir_U2G,=Epoch0,seq_req:seq_t,
+        =Type_RekeyReq,=Len_RekeyReq,enc_req:aead_t));
+  let n_req = make_gcm_nonce(Epoch0,seq_req) in
+  let ad_req = make_aad(sid,Dir_U2G,Epoch0,seq_req,Type_RekeyReq,Len_RekeyReq) in
+  let p_req = aead_dec(k_u2g_old,n_req,ad_req,enc_req) in
+  if get_req_new(p_req) = Epoch1 then
+    let rid = get_req_rid(p_req) in
+    let ct = get_req_ct(p_req) in
+    let ss = mlkem_decaps(sk_gcs,ct) in
+    let rh = make_rh(sid,Epoch0,Epoch1,rid,ct) in
+    let rprk = hkdf_extract_rekey(es0,ss) in
+    let es1 = hkdf_expand(rprk,info_es(Epoch1,rh)) in
+    let ku1 = hkdf_expand(es1,info_u2g(sid,Epoch1)) in
+    let kg1 = hkdf_expand(es1,info_g2u(sid,Epoch1)) in
+    let krk = hkdf_expand(es1,info_rekey_confirm(rh)) in
+    let kc = hmac(krk,kc_input(rh,rid,Epoch1)) in
+    event GCS_Rekey_Prepared(g,u,sid,rid,es1);
+
+    (* R2 under the old G2U key. *)
+    new seq_ack:seq_t;
+    let n_ack = make_gcm_nonce(Epoch0,seq_ack) in
+    let ad_ack = make_aad(sid,Dir_G2U,Epoch0,seq_ack,Type_RekeyAck,Len_RekeyAck) in
+    let enc_ack = aead_enc(
+        k_g2u_old,n_ack,ad_ack,payload_rekey_ack(rid,Epoch1,kc)) in
+    out(c,(sid,Dir_G2U,Epoch0,seq_ack,Type_RekeyAck,Len_RekeyAck,enc_ack));
+
+    (* Normal GCS command traffic remains on epoch e while waiting for R3. *)
+    new seq_wait:seq_t;
+    let n_wait = make_gcm_nonce(Epoch0,seq_wait) in
+    let ad_wait = make_aad(sid,Dir_G2U,Epoch0,seq_wait,Type_Command,Len_Command_Test) in
+    out(c,(sid,Dir_G2U,Epoch0,seq_wait,Type_Command,Len_Command_Test,
+           aead_enc(k_g2u_old,n_wait,ad_wait,payload_command(AckWaitCommand))));
+
+    (* R3 under the new U2G key. *)
+    in(c,(=sid,=Dir_U2G,=Epoch1,seq_c:seq_t,
+          =Type_RekeyCommit,=Len_RekeyCommit,enc_c:aead_t));
+    let n_c = make_gcm_nonce(Epoch1,seq_c) in
+    let ad_c = make_aad(sid,Dir_U2G,Epoch1,seq_c,Type_RekeyCommit,Len_RekeyCommit) in
+    let p_c = aead_dec(ku1,n_c,ad_c,enc_c) in
+    if get_commit_rid(p_c) = rid then
+      event GCS_Rekey_Commit(g,u,sid,rid,es1);
+
+      (* R4 under the new G2U key. *)
+      new seq_ready:seq_t;
+      let n_ready = make_gcm_nonce(Epoch1,seq_ready) in
+      let ad_ready = make_aad(
+          sid,Dir_G2U,Epoch1,seq_ready,Type_RekeyReady,Len_RekeyReady) in
+      let enc_ready = aead_enc(
+          kg1,n_ready,ad_ready,payload_rekey_ready(rid)) in
+      event GCS_Rekey_Ready(g,u,sid,rid,es1);
+      out(c,(sid,Dir_G2U,Epoch1,seq_ready,
+             Type_RekeyReady,Len_RekeyReady,enc_ready));
+
+      (* New-epoch G2U secrecy witness after Commit. *)
+      new seq_newcmd:seq_t;
+      let n_newcmd = make_gcm_nonce(Epoch1,seq_newcmd) in
+      let ad_newcmd = make_aad(
+          sid,Dir_G2U,Epoch1,seq_newcmd,Type_Command,Len_Command_Test) in
+      out(c,(sid,Dir_G2U,Epoch1,seq_newcmd,Type_Command,Len_Command_Test,
+             aead_enc(kg1,n_newcmd,ad_newcmd,
+                      payload_command(secret_rekey_g2u)))).
+
+let processUAVRekeyCore(u:host,g:host,sid:sid_t,pk_gcs:pkey,
+                        es0:sym_key,k_u2g_old:sym_key,k_g2u_old:sym_key) =
+  new rid:rid_t;
+  new r_mlkem:nonce;
+  let ct = mlkem_encaps_ct(pk_gcs,r_mlkem) in
+  let ss = mlkem_encaps_ss(pk_gcs,r_mlkem) in
+  let rh = make_rh(sid,Epoch0,Epoch1,rid,ct) in
+  let rprk = hkdf_extract_rekey(es0,ss) in
+  let es1 = hkdf_expand(rprk,info_es(Epoch1,rh)) in
+  let ku1 = hkdf_expand(es1,info_u2g(sid,Epoch1)) in
+  let kg1 = hkdf_expand(es1,info_g2u(sid,Epoch1)) in
+  let krk = hkdf_expand(es1,info_rekey_confirm(rh)) in
+  let kc_expected = hmac(krk,kc_input(rh,rid,Epoch1)) in
+  event UAV_Rekey_Request(g,u,sid,rid,es1);
+
+  (* R1 under old U2G key; payload contains only target epoch, RID, ct'. *)
+  let reqp = payload_rekey_req(Epoch1,rid,ct) in
+  new seq1:seq_t;
+  let n1 = make_gcm_nonce(Epoch0,seq1) in
+  let ad1 = make_aad(sid,Dir_U2G,Epoch0,seq1,Type_RekeyReq,Len_RekeyReq) in
+  out(c,(sid,Dir_U2G,Epoch0,seq1,Type_RekeyReq,Len_RekeyReq,
+         aead_enc(k_u2g_old,n1,ad1,reqp)));
+
+  (* Normal telemetry remains on epoch e until R4. *)
+  new seq_tel:seq_t;
+  let n_tel = make_gcm_nonce(Epoch0,seq_tel) in
+  let ad_tel = make_aad(
+      sid,Dir_U2G,Epoch0,seq_tel,Type_Telemetry,Len_Telemetry_Test) in
+  out(c,(sid,Dir_U2G,Epoch0,seq_tel,Type_Telemetry,Len_Telemetry_Test,
+         aead_enc(k_u2g_old,n_tel,ad_tel,payload_telemetry(AckWaitTelemetry))));
+
+  (* R2 under old G2U key; verify KC_G from the new ES. *)
+  in(c,(=sid,=Dir_G2U,=Epoch0,seq_ack:seq_t,
+        =Type_RekeyAck,=Len_RekeyAck,enc_ack:aead_t));
+  let n_ack = make_gcm_nonce(Epoch0,seq_ack) in
+  let ad_ack = make_aad(sid,Dir_G2U,Epoch0,seq_ack,Type_RekeyAck,Len_RekeyAck) in
+  let p_ack = aead_dec(k_g2u_old,n_ack,ad_ack,enc_ack) in
+  if get_ack_rid(p_ack) = rid then
+    if get_ack_epoch(p_ack) = Epoch1 then
+      if get_ack_kc(p_ack) = kc_expected then
+        event UAV_Rekey_Commit(g,u,sid,rid,es1);
+
+        (* R3: payload {RID,COMMIT}; COMMIT is implicit in the constructor. *)
+        let cp = payload_rekey_commit(rid) in
+        new seq3:seq_t;
+        let n3 = make_gcm_nonce(Epoch1,seq3) in
+        let ad3 = make_aad(
+            sid,Dir_U2G,Epoch1,seq3,Type_RekeyCommit,Len_RekeyCommit) in
+        out(c,(sid,Dir_U2G,Epoch1,seq3,Type_RekeyCommit,Len_RekeyCommit,
+               aead_enc(ku1,n3,ad3,cp)));
+
+        (* R4: payload {RID,READY}; READY is implicit in the constructor. *)
+        in(c,(=sid,=Dir_G2U,=Epoch1,seq_ready:seq_t,
+              =Type_RekeyReady,=Len_RekeyReady,enc_ready:aead_t));
+        let n_ready = make_gcm_nonce(Epoch1,seq_ready) in
+        let ad_ready = make_aad(
+            sid,Dir_G2U,Epoch1,seq_ready,Type_RekeyReady,Len_RekeyReady) in
+        let p_ready = aead_dec(kg1,n_ready,ad_ready,enc_ready) in
+        if get_ready_rid(p_ready) = rid then
+          event UAV_Rekey_Done(g,u,sid,rid,es1);
+
+          (* New-epoch U2G secrecy witness after Ready. *)
+          new seq_newtel:seq_t;
+          let n_newtel = make_gcm_nonce(Epoch1,seq_newtel) in
+          let ad_newtel = make_aad(
+              sid,Dir_U2G,Epoch1,seq_newtel,Type_Telemetry,Len_Telemetry_Test) in
+          out(c,(sid,Dir_U2G,Epoch1,seq_newtel,Type_Telemetry,Len_Telemetry_Test,
+                 aead_enc(ku1,n_newtel,ad_newtel,
+                          payload_telemetry(secret_rekey_u2g)))).
+
+process
+  let pk_g = mlkem_pk(sk_g) in
+  out(c,pk_g);
+  !(
+    new id_u:host;
+    new id_g:host;
+    new session_sid:sid_t;
+    new es0:sym_key;
+    let ku0 = hkdf_expand(es0,info_u2g(session_sid,Epoch0)) in
+    let kg0 = hkdf_expand(es0,info_g2u(session_sid,Epoch0)) in
+    (* SID is public because it appears in every AEAD header. Entity labels are
+       event-only and are not wire fields. *)
+    out(c,session_sid);
+    (
+      processUAVRekeyCore(id_u,id_g,session_sid,pk_g,es0,ku0,kg0)
+      |
+      processGCSRekeyCore(id_g,id_u,session_sid,sk_g,es0,ku0,kg0)
+    )
+  )
